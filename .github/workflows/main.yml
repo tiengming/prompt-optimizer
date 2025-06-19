@@ -2,66 +2,67 @@ name: Push Static Web to dist-pages
 
 on:
   push:
-    branches:
-      - master
+    branches: [ master ]
   workflow_dispatch:
 
 jobs:
   deploy-static:
     runs-on: ubuntu-latest
-
     steps:
       - name: 🧾 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0        # <—— 一定要拿到完整历史，才能强推 orphan 分支
 
       - name: 🧶 Setup pnpm
         uses: pnpm/action-setup@v3
-        with:
-          version: 8
+        with: { version: 8 }
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'pnpm'
+          node-version: 20
+          cache: pnpm
 
       - name: 📦 Install dependencies
         run: pnpm install
 
       - name: 🛠️ Build all packages
         run: pnpm -r build
-        
+
       - name: 🚀 Deploy dist to dist-pages branch
         run: |
+          # 1. 提交信息配置
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git fetch origin
-          git reset --hard HEAD
-      
-          # ✅ 先确认构建产物存在
+
+          # 2. 确认 dist 文件夹存在
           if [ ! -d "packages/web/dist" ]; then
             echo "❌ 构建产物不存在，跳过部署"
             exit 1
           fi
-      
-          git switch --orphan dist-pages
-          git rm -rf .
-      
-          # ✅ 检查是否复制成功
-          cp -a packages/web/dist/* . || {
-            echo "❌ 复制构建产物失败"
-            exit 1
-          }
-      
+
+          # 3. 切分支并清空（保留 .git）
+          git fetch origin
+          git checkout --orphan dist-pages
+          git reset --hard
+
+          # 4. 删除除 .git 以外的所有文件（* 和隐藏文件 .开头 的都删）
+          rm -rf * .[^.]* 2>/dev/null || true
+
+          # 5. 复制构建产物到根目录
+          cp -a packages/web/dist/. .
+
+          # 6. 禁用 Jekyll（GH Pages 专用，可选）
           touch .nojekyll
-      
-          # ✅ 确认当前目录下确实有文件再 git add
+
+          # 7. 确认有文件再提交
           if [ -z "$(ls -A)" ]; then
-            echo "❌ 当前工作目录为空，终止部署"
+            echo "❌ 当前目录依旧为空，终止部署"
             exit 1
           fi
-      
-          git add .
-          git commit -m "Deploy latest static build [skip ci]"
-          git push --force origin dist-pages
 
+          # 8. 一次性 add + commit + force push
+          git add -A
+          git commit -m "Deploy latest static build [skip ci]" || echo "⚠️ No changes to commit"
+          git push --force origin dist-pages
