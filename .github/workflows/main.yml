@@ -36,10 +36,11 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git fetch origin
+          git reset --hard HEAD  
           git switch --orphan dist-pages
           git rm -rf .
           cp -r packages/web/dist/* .
-          touch .nojekyll  # optional, if needed
+          touch .nojekyll
           git add .
           git commit -m "Deploy latest static build [skip ci]"
           git push --force origin dist-pages
