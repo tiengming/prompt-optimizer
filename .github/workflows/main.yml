@@ -1,4 +1,4 @@
-name: Push Static Web to dist-pages
+name: Deploy to dist-pages
 
 on:
   push:
@@ -6,63 +6,37 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy-static:
+  deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: 🧾 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0        # <—— 一定要拿到完整历史，才能强推 orphan 分支
+          fetch-depth: 0        # 拿到完整历史，才能推 orphan 分支
 
-      - name: 🧶 Setup pnpm
+      - name: Setup pnpm
         uses: pnpm/action-setup@v3
-        with: { version: 8 }
+        with:
+          version: 8
 
-      - name: 🔧 Setup Node.js
+      - name: Setup Node.js & Cache pnpm
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: pnpm
 
-      - name: 📦 Install dependencies
-        run: pnpm install
-
-      - name: 🛠️ Build all packages
-        run: pnpm -r build
-
-      - name: 🚀 Deploy dist to dist-pages branch
+      - name: Install & Build all packages
         run: |
-          # 1. 提交信息配置
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          pnpm install
+          pnpm -r build
 
-          # 2. 确认 dist 文件夹存在
-          if [ ! -d "packages/web/dist" ]; then
-            echo "❌ 构建产物不存在，跳过部署"
-            exit 1
-          fi
+      - name: Debug ls
+        run: ls -R packages/web
 
-          # 3. 切分支并清空（保留 .git）
-          git fetch origin
-          git checkout --orphan dist-pages
-          git reset --hard
-
-          # 4. 删除除 .git 以外的所有文件（* 和隐藏文件 .开头 的都删）
-          rm -rf * .[^.]* 2>/dev/null || true
-
-          # 5. 复制构建产物到根目录
-          cp -a packages/web/dist/. .
-
-          # 6. 禁用 Jekyll（GH Pages 专用，可选）
-          touch .nojekyll
-
-          # 7. 确认有文件再提交
-          if [ -z "$(ls -A)" ]; then
-            echo "❌ 当前目录依旧为空，终止部署"
-            exit 1
-          fi
-
-          # 8. 一次性 add + commit + force push
-          git add -A
-          git commit -m "Deploy latest static build [skip ci]" || echo "⚠️ No changes to commit"
-          git push --force origin dist-pages
+      - name: Publish to dist-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: packages/web/dist
+          publish_branch: dist-pages
