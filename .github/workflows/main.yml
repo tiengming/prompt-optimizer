@@ -48,7 +48,7 @@ jobs:
           git rm -rf .
       
           # ✅ 检查是否复制成功
-          cp -r packages/web/dist/* . || {
+          cp -a packages/web/dist/* . || {
             echo "❌ 复制构建产物失败"
             exit 1
           }
