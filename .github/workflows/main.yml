@@ -36,11 +36,32 @@ jobs:
           git config --global user.name 'github-actions[bot]'
           git config --global user.email 'github-actions[bot]@users.noreply.github.com'
           git fetch origin
-          git reset --hard HEAD  
+          git reset --hard HEAD
+      
+          # ✅ 先确认构建产物存在
+          if [ ! -d "packages/web/dist" ]; then
+            echo "❌ 构建产物不存在，跳过部署"
+            exit 1
+          fi
+      
           git switch --orphan dist-pages
           git rm -rf .
-          cp -r packages/web/dist/* .
+      
+          # ✅ 检查是否复制成功
+          cp -r packages/web/dist/* . || {
+            echo "❌ 复制构建产物失败"
+            exit 1
+          }
+      
           touch .nojekyll
+      
+          # ✅ 确认当前目录下确实有文件再 git add
+          if [ -z "$(ls -A)" ]; then
+            echo "❌ 当前工作目录为空，终止部署"
+            exit 1
+          fi
+      
           git add .
           git commit -m "Deploy latest static build [skip ci]"
           git push --force origin dist-pages
+
