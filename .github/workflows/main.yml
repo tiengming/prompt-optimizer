@@ -1,4 +1,4 @@
-name: Build Static Web
+name: Push Static Web to dist-pages
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-static:
+  deploy-static:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,11 +28,18 @@ jobs:
       - name: 📦 Install dependencies
         run: pnpm install
 
-      - name: 🛠️ Build project
-        run: pnpm -r build
+      - name: 🛠️ Build Web App
+        run: pnpm -F @prompt-optimizer/web build
 
-      - name: 📁 Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: packages/web/dist
+      - name: 🚀 Deploy dist to dist-pages branch
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch origin
+          git switch --orphan dist-pages
+          git rm -rf .
+          cp -r packages/web/dist/* .
+          touch .nojekyll  # optional, if needed
+          git add .
+          git commit -m "Deploy latest static build [skip ci]"
+          git push --force origin dist-pages
